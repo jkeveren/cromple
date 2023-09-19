@@ -2,7 +2,11 @@
 
 # Just using a dumb build script for this because the purpose of this tool is to replace complicated build tools so trying to avoid using one here.
 
+echo Compiling...
+
 g++ \
+-O0 \
+-ggdb \
 -std=c++23 \
 `# Stop on the first error to make it easier to read.`\
 -Wfatal-errors \
@@ -22,6 +26,7 @@ g++ \
 -Wno-error=unused-parameter \
 -Wno-error=unused-result \
 -Wno-error=unused-variable \
+-lclang \
 `# Put it in the bin.`\
 -o bin/main \
 `# Yea compile that one.`\
