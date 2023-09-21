@@ -1,10 +1,12 @@
 #include <iostream>
 #include <format>
 #include <expected>
-#include <clang-c/Index.h>
+#include <vector>
 
 // #include <cstdio>
 #include <cstring>
+
+#include <clang-c/Index.h>
 
 // Using wrapper namespace to avoid global namespace because it is poluted by c crap that gets included by c++ includes.
 // Access all global names with "::<name>" e.g. "::FILE" or "::error_t".
@@ -180,13 +182,107 @@ namespace program_n {
 			// Read cursor string.
 			char *buffer = (char *)alloca(length + 1);
 			if (std::fread(buffer, sizeof(char), length, file) != length) {
-				error = error_t::strerror().append(std::format("Error reading {} char from file from position {} to {}. ferror() = {}; feof() = {}.", length, start, end, ferror(file), feof(file)));
+				error = error_t::strerror().append(std::format("Error reading {} char from file from position {} to {}.", length, start, end));
 				break;
 			}
 
 			return std::string(buffer);
 		} while (false);
 		return std::unexpected(error.append("Error getting cursor string."));
+	}
+
+	// Returns a list of header files included in file at given path.
+	std::expected<std::vector<std::string>, error_t> get_user_headers(std::string path) {
+		error_t error;
+		std::vector<std::string> result;
+
+		CXTranslationUnit translation_unit;
+		CXIndex index;
+		do {
+			index = clang_createIndex(0, 0);
+
+			unsigned options = CXTranslationUnit_DetailedPreprocessingRecord
+				| CXTranslationUnit_SkipFunctionBodies
+			;
+
+			const char *arguments = "-I./test/include"; // TODO: NO HARDCODE. HARDCODE BAD!
+			CXErrorCode clang_error = clang_parseTranslationUnit2(index, path.c_str(), &arguments, 1, nullptr, 0, options, &translation_unit);
+			if (clang_error != 0) {
+				error = error_t(std::format("Clang error code {}.\nError parsing file \"{}\".", (int)clang_error, path));
+				break;
+			}
+
+			CXCursor cursor = clang_getTranslationUnitCursor(translation_unit);
+
+			std::FILE *file = fopen(path.c_str(), "r");
+			if (file == nullptr) {
+				error = error_t::strerror().append(std::format("Error opening file \"{}\".", path));
+				break;
+			}
+
+			struct visitor_data_t {
+				error_t error;
+				std::FILE *file;
+				std::vector<std::string> user_headers;
+			};
+
+			CXCursorVisitor visitor = [](CXCursor cursor, [[maybe_unused]] CXCursor parent, [[maybe_unused]] CXClientData client_data) -> CXChildVisitResult {
+				error_t error;
+				visitor_data_t &visitor_data = *(visitor_data_t *)client_data;
+				do {
+					if (
+						// Cursor is on an include directive.
+						clang_getCursorKind(cursor) == CXCursor_InclusionDirective
+						// Cursor is in the currnet file and has not recursed into another include.
+						&& clang_Location_isFromMainFile(clang_getCursorLocation(cursor))
+					) {
+						// Get full include directive
+						std::expected<std::string, error_t> expected_include = get_cursor_string(cursor, visitor_data.file);
+						if (!expected_include) {
+							visitor_data.error = expected_include.error();
+							break;
+						}
+						std::string include = expected_include.value();
+
+						// Skip system headers.
+						if (include[include.length() - 1] == '>') {
+							return CXChildVisit_Continue;
+						}
+						
+						// Get contents of brackets or quotes from include directive.
+						CXString clang_str = clang_getCursorSpelling(cursor);
+						std::string header = clang_getCString(clang_str);
+						clang_disposeString(clang_str);
+
+						visitor_data.user_headers.push_back(header);
+					}
+
+					return CXChildVisit_Continue;
+				} while (false);
+				visitor_data.error.append("Error parsing headers.");
+				return CXChildVisit_Break;
+			};
+			
+			visitor_data_t visitor_data;
+			visitor_data.file = file;
+			clang_visitChildren(cursor, visitor, &visitor_data);
+			if (visitor_data.error) {
+				error = visitor_data.error.append(std::format("Error parsing headers from file \"{}\".", path));
+				break;
+			}
+
+			result = visitor_data.user_headers;
+			break;
+		} while (false);
+
+		clang_disposeTranslationUnit(translation_unit);
+		clang_disposeIndex(index);
+
+		if (error) {
+			return std::unexpected(error);
+		} else {
+			return result;
+		}
 	}
 
 	int main(int argc, char *argv[]) {
@@ -210,72 +306,15 @@ namespace program_n {
 			return error_t("Origin file was not provided.").print();
 		}
 
-		CXIndex index = clang_createIndex(0, 0);
-
-		CXTranslationUnit translation_unit;
-		unsigned options = CXTranslationUnit_DetailedPreprocessingRecord
-			| CXTranslationUnit_SkipFunctionBodies
-		;
-
-		const char *arguments = "-I./test/include"; // TODO: NO HARDCODE. HARDCODE BAD!
-		CXErrorCode clang_error = clang_parseTranslationUnit2(index, origin_file_path.c_str(), &arguments, 1, nullptr, 0, options, &translation_unit);
-		if (clang_error != 0) {
-			return error_t(std::format("Clang error code {}.\nError parsing file \"{}\".", (int)clang_error, origin_file_path)).print();
+		std::expected<std::vector<std::string>, error_t> expected_headers = get_user_headers(origin_file_path);
+		if (!expected_headers) {
+			return expected_headers.error().print();
 		}
+		std::vector<std::string> headers = expected_headers.value();
 
-		CXCursor cursor = clang_getTranslationUnitCursor(translation_unit);
-
-		std::FILE *file = fopen(origin_file_path.c_str(), "r");
-		if (file == nullptr) {
-			return error_t::strerror().append(std::format("Error opening file \"{}\".", origin_file_path)).print();
+		for (const std::string &header : headers) {
+			puts(header.c_str());
 		}
-
-		struct visitor_data_t {
-			error_t error;
-			std::FILE *file;
-		};
-
-		CXCursorVisitor visitor = [](CXCursor cursor, [[maybe_unused]] CXCursor parent, [[maybe_unused]] CXClientData client_data) -> CXChildVisitResult {
-			visitor_data_t &visitor_data = *(visitor_data_t *)client_data;
-			do {
-				if (
-					// Cursor is on an include directive.
-					clang_getCursorKind(cursor) == CXCursor_InclusionDirective
-					// Cursor is in the currnet file and has not recursed into another include.
-					&& clang_Location_isFromMainFile(clang_getCursorLocation(cursor))
-				) {
-					// Get full include directive
-					std::expected<std::string, error_t> include = get_cursor_string(cursor, visitor_data.file);
-					if (!include) {
-						visitor_data.error = include.error();
-						break;
-					}
-
-					std::puts(include.value().c_str());
-					
-					// Get contents of brackets or quotes from include directive.
-					CXString clang_str = clang_getCursorSpelling(cursor);
-					std::string include_target = clang_getCString(clang_str);
-					clang_disposeString(clang_str);
-
-					std::puts(include_target.c_str());
-				}
-
-				return CXChildVisit_Continue;
-			} while (false);
-			visitor_data.error.append("Error parsing headers.");
-			return CXChildVisit_Break;
-		};
-		
-		visitor_data_t visitor_data;
-		visitor_data.file = file;
-		clang_visitChildren(cursor, visitor, &visitor_data);
-		if (visitor_data.error) {
-			return visitor_data.error.append(std::format("Error parsing headers from file \"{}\".", origin_file_path)).print();
-		}
-
-		clang_disposeTranslationUnit(translation_unit);
-		clang_disposeIndex(index);
 		
 		// // Compile file.
 		// std::expected<int, error_t> status = command_t(std::string("g++ ") + origin_file_path.string(), "r").run();
