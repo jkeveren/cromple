@@ -2,13 +2,15 @@
 #include <format>
 #include <expected>
 #include <vector>
+#include <map>
+#include <filesystem>
+#include <thread>
 
-// #include <cstdio>
 #include <cstring>
 
 #include <clang-c/Index.h>
 
-// Using wrapper namespace to avoid global namespace because it is poluted by c crap that gets included by c++ includes.
+// Using wrapper namespace to avoid global namespace because it is poluted by c crap that gets included by c++ includes like error_t. The audacity to use such a generic type name in global scope, honestly.
 // Access all global names with "::<name>" e.g. "::FILE" or "::error_t".
 namespace program_n {
 
@@ -192,9 +194,10 @@ namespace program_n {
 	}
 
 	// Returns a list of header files included in file at given path.
-	std::expected<std::vector<std::string>, error_t> get_user_headers(std::string path) {
+	// compiler_arguments must contain include arguments for correct header file resolution but can contain all valid compiler arguments.
+	std::expected<std::filesystem::file_time_type, error_t> get_latest_header_write_time(std::string path, std::vector<std::string> compiler_arguments) {
 		error_t error;
-		std::vector<std::string> result;
+		std::filesystem::file_time_type result;
 
 		CXTranslationUnit translation_unit;
 		CXIndex index;
@@ -205,8 +208,16 @@ namespace program_n {
 				| CXTranslationUnit_SkipFunctionBodies
 			;
 
-			const char *arguments = "-I./test/include"; // TODO: NO HARDCODE. HARDCODE BAD!
-			CXErrorCode clang_error = clang_parseTranslationUnit2(index, path.c_str(), &arguments, 1, nullptr, 0, options, &translation_unit);
+			// Transform compiler_arguments from vector of strings to array of char arrays.
+			size_t argument_count = compiler_arguments.size();
+			char **arguments = (char **)calloc(argument_count, sizeof(char *));
+			for (size_t i = 0; i < argument_count; i++) {
+				std::string argument = compiler_arguments[i];
+				arguments[i] = (char *)calloc(argument.length(), sizeof(char));
+				strcpy(arguments[i], argument.c_str());
+			}
+
+			CXErrorCode clang_error = clang_parseTranslationUnit2(index, path.c_str(), arguments, argument_count, nullptr, 0, options, &translation_unit);
 			if (clang_error != 0) {
 				error = error_t(std::format("Clang error code {}.\nError parsing file \"{}\".", (int)clang_error, path));
 				break;
@@ -223,11 +234,10 @@ namespace program_n {
 			struct visitor_data_t {
 				error_t error;
 				std::FILE *file;
-				std::vector<std::string> user_headers;
+				std::filesystem::file_time_type latest_header_write_time = std::filesystem::file_time_type::min(); // defaults to epoch (0);
 			};
 
 			CXCursorVisitor visitor = [](CXCursor cursor, [[maybe_unused]] CXCursor parent, [[maybe_unused]] CXClientData client_data) -> CXChildVisitResult {
-				error_t error;
 				visitor_data_t &visitor_data = *(visitor_data_t *)client_data;
 				do {
 					if (
@@ -244,17 +254,26 @@ namespace program_n {
 						}
 						std::string include = expected_include.value();
 
-						// Skip system headers.
+						// Skip system headers. (#include <stdio.h>)
 						if (include[include.length() - 1] == '>') {
 							return CXChildVisit_Continue;
 						}
-						
-						// Get contents of brackets or quotes from include directive.
-						CXString clang_str = clang_getCursorSpelling(cursor);
-						std::string header = clang_getCString(clang_str);
-						clang_disposeString(clang_str);
 
-						visitor_data.user_headers.push_back(header);
+						// Get included file path
+						CXFile included_cxfile = clang_getIncludedFile(cursor);
+						CXString included_cxname = clang_getFileName(included_cxfile);
+						const char *included_cstring = clang_getCString(included_cxname);
+						if (included_cstring == nullptr) {
+							puts(include.c_str());
+						}
+						std::filesystem::path included_path = included_cstring;
+						clang_disposeString(included_cxname);
+
+						std::filesystem::file_time_type last_write_time = std::filesystem::last_write_time(included_path);
+
+						if (last_write_time > visitor_data.latest_header_write_time) {
+							visitor_data.latest_header_write_time = last_write_time;
+						}
 					}
 
 					return CXChildVisit_Continue;
@@ -271,7 +290,7 @@ namespace program_n {
 				break;
 			}
 
-			result = visitor_data.user_headers;
+			result = visitor_data.latest_header_write_time;
 			break;
 		} while (false);
 
@@ -286,46 +305,199 @@ namespace program_n {
 	}
 
 	int main(int argc, char *argv[]) {
-		std::string origin_file_path;
+		// Usage: <this executable> [--compiler COMPILER] [--source SOURCE_DIRECTORY=src] [--objects OBJECT_DIRECTORY=objects] [-o OUTPUT_FILE=a.out] [COMPILER_OPTIONS]
+		// Order independent.
 
-		// Parse arguments.
-		// Start at 1 because the 0th arg is this executable.
+		// Parse arguments
+		// Argument variables (defaults below parsing)
+		std::string source_directory;
+		std::string object_directory;
+		std::string out_file;
+		std::string compiler;
+		std::vector<std::string> compiler_arguments;
+
+		std::map<std::string, std::string *> argument_pointers {
+			{"--source", &source_directory}, // source_directory must be provided by a named argument because we can't know which arguments belong to a previous compiler argument like "library" in "-l library". We can't accurately parse all compiler args.
+			{"--objects", &object_directory},
+			{"-o", &out_file},
+			{"--compiler", &compiler},
+		};
+
+		// Points to where to store the next option. When finding "--compiler" point this to compiler so it gets set in the next loop.
+		std::string *argument_pointer = nullptr;
+
+		// Start at 1st arg because the 0th arg is this executable.
 		for (int i = 1; i < argc; i++) {
 			std::string arg = std::string(argv[i]);
 
-			// Ignore options for now.
-			if (arg[0] == '-') {
+			// Store second part of non-compiler key-value arguments, e.g. "--compiler g++" or "-o out"
+			if (argument_pointer != nullptr) {
+				*argument_pointer = arg;
+				argument_pointer = nullptr;
 				continue;
 			}
 
-			origin_file_path = arg;
-			break;
+			// Parse 
+			if (arg[0] == '-') {
+				// Point argument_pointer to place to store next argument.
+				std::map<std::string, std::string *>::iterator flag_iterator = argument_pointers.find(arg);
+				// Is this a non-compiler key-value argument?
+				if (flag_iterator != argument_pointers.end()) {
+					argument_pointer = flag_iterator->second;
+					continue;
+				}
+			}
+
+			compiler_arguments.push_back(arg);
+			continue;
 		}
 
-		if (origin_file_path.empty()) {
-			return error_t("Origin file was not provided.").print();
+		// Default arguments.
+		if (source_directory.empty()) {source_directory = "src";}
+		constexpr std::string_view object_directory_default = "objects";
+		if (object_directory.empty()) {object_directory = object_directory_default;}
+		if (out_file.empty()) {out_file = "a.out";}
+		if (compiler.empty()) {compiler = "gcc";}
+
+		// Convert to paths.
+		std::filesystem::path source_directory_path(source_directory);
+		std::filesystem::path object_directory_path(object_directory);
+		std::filesystem::path out_file_path(out_file);
+
+		// Assert that object_directory exists and is a directory.
+		if (!std::filesystem::is_directory(object_directory)) {
+			return error_t(std::format("Object directory \"{}\" is not a directory. Create it or change it with the \"--objects\" argument (defaults to \"{}\").", object_directory, object_directory_default)).print();
 		}
 
-		std::expected<std::vector<std::string>, error_t> expected_headers = get_user_headers(origin_file_path);
-		if (!expected_headers) {
-			return expected_headers.error().print();
-		}
-		std::vector<std::string> headers = expected_headers.value();
+		// Vector of pairs of source and object files to be compiled.
+		std::vector<std::pair<std::filesystem::path, std::filesystem::path>> source_object_pairs;
+		std::vector<std::string> object_files;
 
-		for (const std::string &header : headers) {
-			puts(header.c_str());
+		// Get source_directory iterator.
+		std::filesystem::directory_iterator iterator;
+		try {
+			iterator = std::filesystem::directory_iterator(source_directory_path);
+		} catch (std::exception &e) {
+			return error_t(e.what()).append(std::format("Error iterating directory \"{}\".", source_directory)).print();
 		}
-		
-		// // Compile file.
-		// std::expected<int, error_t> status = command_t(std::string("g++ ") + origin_file_path.string(), "r").run();
-		// if (!status) {
-		// 	if (status.error().reason == command_t::error_reason_command_already_running) {
-		// 		std::cout << "ur dumb" << std::endl;
-		// 	}
-		// 	return status.error().append("Error running compilation command.").print();
-		// }
 
-		// std::cout << "Compiler exited with status: " << status.value() << std::endl;
+		// Find which source files need compiling.
+		// Iterate over source_directory entries.
+		for (const std::filesystem::directory_entry &entry : iterator) {
+			// Skip non-readable files. Do not skip symlinks (!is_regular_file would make us skip symlinks).
+			if (entry.is_directory()) {
+				continue;
+			}
+
+			// Get source and object paths.
+			std::filesystem::path source_path = entry.path();
+			std::filesystem::path object_path = object_directory_path / (source_path.filename().string() + ".o");
+			object_files.push_back(object_path);
+
+			// Make pair to store in vector.
+			std::pair<std::filesystem::path, std::filesystem::path> pair {source_path, object_path};
+
+			// If object file does not exist.
+			if (!std::filesystem::exists(object_path)) {
+				// Add source and object to compilation vector.
+				source_object_pairs.push_back(pair);
+				continue;
+			}
+
+			// Get write times.
+			std::filesystem::file_time_type source_time = std::filesystem::last_write_time(source_path);
+			std::filesystem::file_time_type object_time = std::filesystem::last_write_time(object_path);
+
+			// If source is newer than object.
+			if (source_time > object_time) {
+				source_object_pairs.push_back(pair);
+				continue;
+			}
+
+			// Get headers and latest write time.
+			std::expected<std::filesystem::file_time_type, error_t> latest_header_write_time = get_latest_header_write_time(source_path, compiler_arguments);
+			if (!latest_header_write_time) {
+				return latest_header_write_time.error().append("Error finding source files that need recompiling").print();
+			}
+
+			// If headers are newer than object.
+			if (latest_header_write_time.value() > object_time) {
+				source_object_pairs.push_back(pair);
+				continue;
+			}
+		}
+
+		// Compile objects.
+		{
+			for (const std::pair<std::filesystem::path, std::filesystem::path> &pair : source_object_pairs) {
+				std::filesystem::path source_path = pair.first;
+				std::filesystem::path object_path = pair.second;
+
+				// Pertinent args coppied directly from "gcc --help" command:
+				// -c                       Compile and assemble, but do not link.
+				// -o <file>                Place the output into <file>.
+				std::string command_string = std::format("{} -c {} -o {}", compiler, source_path.string(), object_path.string());
+				// Pass all other arguments on to compiler. Linker arguments are ignored.
+				for (const std::string &argument : compiler_arguments) {
+					command_string += " " + argument;
+				}
+
+				command_t command(command_string, "r");
+				std::expected<int, error_t> expected_status = command.run();
+				if (!expected_status) {
+					return expected_status.error().append(std::format(
+						"Error compiling source file \"{}\" to object file \"{}\" with command \"{}\".",
+						source_path.string(), object_path.string(), command_string
+					)).print();
+				}
+
+				if (expected_status.value() != 0) {
+					return error_t(std::format(
+						"Exit code {} when compiling source file \"{}\" to object file \"{}\" with command \"{}\".",
+						expected_status.value(), source_path.string(), object_path.string(), command_string
+					)).print();
+				}
+			}
+		}
+
+		// Link final binary.
+		{
+			// Not checking if linking is explicitly required.
+			// Just link the executable every time.
+			// KISS. No need to add complexity here.
+			// This program will usually only be run when something changes.
+			// Linking should be pretty fast.
+			// Checking modtimes and comparing etc adds complexity for almost nothing.
+			// What if the user want to re-link?
+
+			// Build link command.
+			std::string command_string = std::format("{} -o {}", compiler, out_file);
+			// Pass all other arguments on to compiler. Linker arguments are ignored.
+			for (const std::string &argument : compiler_arguments) {
+				command_string += " " + argument;
+			}
+			// Add all object files as input to compiler.
+			for (const std::string &object_file : object_files) {
+				command_string += " " + object_file;
+			}
+
+			// Perform linking.
+			command_t command(command_string, "r");
+			std::expected<int, error_t> expected_status = command.run();
+			if (!expected_status) {
+				return expected_status.error().append(std::format(
+					"Error compiling {} object files into a final binary \"{}\" with command \"{}\".",
+					out_file, object_files.size(), command_string
+				)).print();
+			}
+
+			if (expected_status.value() != 0) {
+				return error_t(std::format(
+					"Exit code {} when compiling {} object files into a final binary executable or library \"{}\" with command \"{}\".",
+					expected_status.value(), object_files.size(), out_file, command_string
+				)).print();
+			}
+		}
 
 		return 0;
 	}

@@ -4,6 +4,8 @@
 // Added quotes and brackets for extra confusion.
 /* comment */ #include /* comment "quotes" <brackets> */ "header.hpp" /* comment */
 
+#include "touch_header.hpp"
+
 int main() {
-	// std::cout << header_variable << std::endl;
+	std::cout << get_string() << std::endl;
 }

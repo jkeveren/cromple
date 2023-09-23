@@ -1,3 +1,3 @@
 #include <string>
 
-std::string header_variable = "Hello World!"
+std::string get_string();

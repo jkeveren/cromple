@@ -30,4 +30,4 @@ g++ \
 `# Put it in the bin.`\
 -o bin/main \
 `# Yea compile that one.`\
-src/main.cpp
+src/*.cpp
