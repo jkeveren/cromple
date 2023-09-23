@@ -1,12 +1,10 @@
 #!/usr/bin/bash
 
-# Just using a dumb build script for this because the purpose of this tool is to replace complicated build tools so trying to avoid using one here.
+# Just using a dumb slow build script for this because the purpose of this tool is to replace complicated build tools so trying to avoid using one here.
 
 echo Compiling...
 
 g++ \
--O0 \
--ggdb \
 -std=c++23 \
 `# Stop on the first error to make it easier to read.`\
 -Wfatal-errors \
@@ -31,3 +29,9 @@ g++ \
 -o bin/main \
 `# Yea compile that one.`\
 src/*.cpp
+
+status=$?
+
+echo Done.
+
+exit $status

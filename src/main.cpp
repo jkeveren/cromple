@@ -4,13 +4,14 @@
 #include <vector>
 #include <map>
 #include <filesystem>
-#include <thread>
+#include <regex>
+#include <chrono>
 
 #include <cstring>
 
 #include <clang-c/Index.h>
 
-// Using wrapper namespace to avoid global namespace because it is poluted by c crap that gets included by c++ includes like error_t. The audacity to use such a generic type name in global scope, honestly.
+// Using wrapper namespace to avoid global namespace because it is polluted by c crap that gets included by c++ includes like error_t. The audacity to use such a generic type name in global scope, honestly.
 // Access all global names with "::<name>" e.g. "::FILE" or "::error_t".
 namespace program_n {
 
@@ -202,10 +203,13 @@ namespace program_n {
 		CXTranslationUnit translation_unit;
 		CXIndex index;
 		do {
-			index = clang_createIndex(0, 0);
+			index = clang_createIndex(0, 0); // Maybe we should be sharing this across translation unit parses. Performance boost?
 
-			unsigned options = CXTranslationUnit_DetailedPreprocessingRecord
-				| CXTranslationUnit_SkipFunctionBodies
+			unsigned options = CXTranslationUnit_DetailedPreprocessingRecord // Required. Record include directives.
+				// Optional optimizations.
+				| CXTranslationUnit_Incomplete // Supress semantic analysis.
+				| CXTranslationUnit_SkipFunctionBodies // Skip function bodies.
+				| CXTranslationUnit_SingleFileParse // Makes thigs a lot faster.
 			;
 
 			// Transform compiler_arguments from vector of strings to array of char arrays.
@@ -213,13 +217,23 @@ namespace program_n {
 			char **arguments = (char **)calloc(argument_count, sizeof(char *));
 			for (size_t i = 0; i < argument_count; i++) {
 				std::string argument = compiler_arguments[i];
-				arguments[i] = (char *)calloc(argument.length(), sizeof(char));
+				arguments[i] = (char *)calloc(argument.length() + 1, sizeof(char)); // +1 for null termination.
 				strcpy(arguments[i], argument.c_str());
 			}
 
 			CXErrorCode clang_error = clang_parseTranslationUnit2(index, path.c_str(), arguments, argument_count, nullptr, 0, options, &translation_unit);
-			if (clang_error != 0) {
-				error = error_t(std::format("Clang error code {}.\nError parsing file \"{}\".", (int)clang_error, path));
+			if (clang_error != CXError_Success) {
+				error = error_t(std::format("Clang CXErrorCode {}.", (int)clang_error));
+
+				CXDiagnosticSet diagnostic_set = clang_getDiagnosticSetFromTU(translation_unit);
+				if (diagnostic_set == nullptr) {
+					error.append("Could not get clang CXDiagnosticSet.");
+				}
+
+				error.append(std::format(
+					"Error parsing translation unit \"{}\".",
+					path
+				));
 				break;
 			}
 
@@ -281,7 +295,7 @@ namespace program_n {
 
 						std::expected<bool, error_t> expected_headers_are_newer = are_headers_newer(included_path, visitor_data.time, visitor_data.compiler_arguments);
 						if (!expected_headers_are_newer) {
-							visitor_data.error = expected_headers_are_newer.error().append("Error recursively getting headers_are_newer.");
+							visitor_data.error = expected_headers_are_newer.error().append("Error recursively getting header modification times.");
 							return CXChildVisit_Break;
 						}
 
@@ -314,15 +328,19 @@ namespace program_n {
 		clang_disposeIndex(index);
 
 		if (error) {
-			return std::unexpected(error.append(std::format("Error parsing headers from file \"{}\".", path)));
+			return std::unexpected(error.append(std::format(
+				"Error checking if headers included in file \"{}\" were modified since {}.",
+				path, std::chrono::file_clock::to_sys(time)
+			)));
 		} else {
 			return result;
 		}
 	}
 
 	int main(int argc, char *argv[]) {
-		// Usage: <this executable> [--compiler COMPILER] [--source SOURCE_DIRECTORY=src] [--objects OBJECT_DIRECTORY=objects] [-o OUTPUT_FILE=a.out] [COMPILER_OPTIONS]
+		// Usage: <this executable> [--compiler COMPILER=g++] [--source SOURCE_DIRECTORY=src] [--objects OBJECT_DIRECTORY=objects] [-o OUTPUT_FILE=a.out] [COMPILER_OPTIONS]
 		// Order independent.
+		// TODO: add help and usage print on error.
 
 		// Parse arguments
 		// Argument variables (defaults below parsing)
@@ -373,7 +391,7 @@ namespace program_n {
 		constexpr std::string_view object_directory_default = "objects";
 		if (object_directory.empty()) {object_directory = object_directory_default;}
 		if (out_file.empty()) {out_file = "a.out";}
-		if (compiler.empty()) {compiler = "gcc";}
+		if (compiler.empty()) {compiler = "g++";}
 
 		// Convert to paths.
 		std::filesystem::path source_directory_path(source_directory);
@@ -405,8 +423,14 @@ namespace program_n {
 				continue;
 			}
 
-			// Get source and object paths.
 			std::filesystem::path source_path = entry.path();
+
+			// Skip non-c source files.
+			static std::regex c_source_file_regex(".+\\.c.*?$");
+			if (!std::regex_match(source_path.string(), c_source_file_regex)) {
+				continue;
+			}
+
 			std::filesystem::path object_path = object_directory_path / (source_path.filename().string() + ".o");
 			object_files.push_back(object_path);
 
@@ -433,7 +457,7 @@ namespace program_n {
 			// Get headers and latest write time.
 			std::expected<bool, error_t> expected_headers_are_newer = are_headers_newer(source_path, object_time, compiler_arguments);
 			if (!expected_headers_are_newer) {
-				return expected_headers_are_newer.error().append("Error finding source files that need recompiling").print();
+				return expected_headers_are_newer.error().append("Error finding source files that need to be compiled.").print();
 			}
 
 			// If headers are newer than object.
@@ -448,6 +472,8 @@ namespace program_n {
 			for (const std::pair<std::filesystem::path, std::filesystem::path> &pair : source_object_pairs) {
 				std::filesystem::path source_path = pair.first;
 				std::filesystem::path object_path = pair.second;
+
+				std::cout << "compiling " << object_path.string() << std::endl;
 
 				// Pertinent args coppied directly from "gcc --help" command:
 				// -c                       Compile and assemble, but do not link.
