@@ -182,12 +182,12 @@ namespace program_n {
 			}
 
 			// Read cursor string.
-			char *buffer = (char *)alloca(length + 1);
+			char *buffer = (char *)alloca(length + 1); // +1 for null termination.
 			if (std::fread(buffer, sizeof(char), length, file) != length) {
 				error = error_t::strerror().append(std::format("Error reading {} char from file from position {} to {}.", length, start, end));
 				break;
 			}
-
+			buffer[length] = (char)NULL; // Null terminate the buffer before parsing into std::string
 			return std::string(buffer);
 		} while (false);
 		return std::unexpected(error.append("Error getting cursor string."));
@@ -195,9 +195,9 @@ namespace program_n {
 
 	// Returns a list of header files included in file at given path.
 	// compiler_arguments must contain include arguments for correct header file resolution but can contain all valid compiler arguments.
-	std::expected<std::filesystem::file_time_type, error_t> get_latest_header_write_time(std::string path, std::vector<std::string> compiler_arguments) {
+	std::expected<bool, error_t> are_headers_newer(std::string path, const std::filesystem::file_time_type &time, const std::vector<std::string> &compiler_arguments) {
 		error_t error;
-		std::filesystem::file_time_type result;
+		bool result = false;
 
 		CXTranslationUnit translation_unit;
 		CXIndex index;
@@ -232,9 +232,11 @@ namespace program_n {
 			}
 
 			struct visitor_data_t {
-				error_t error;
+				error_t &error;
 				std::FILE *file;
-				std::filesystem::file_time_type latest_header_write_time = std::filesystem::file_time_type::min(); // defaults to epoch (0);
+				const std::filesystem::file_time_type &time;
+				const std::vector<std::string> &compiler_arguments;
+				bool &headers_are_newer;
 			};
 
 			CXCursorVisitor visitor = [](CXCursor cursor, [[maybe_unused]] CXCursor parent, [[maybe_unused]] CXClientData client_data) -> CXChildVisitResult {
@@ -246,7 +248,7 @@ namespace program_n {
 						// Cursor is in the currnet file and has not recursed into another include.
 						&& clang_Location_isFromMainFile(clang_getCursorLocation(cursor))
 					) {
-						// Get full include directive
+						// Get full include directive.
 						std::expected<std::string, error_t> expected_include = get_cursor_string(cursor, visitor_data.file);
 						if (!expected_include) {
 							visitor_data.error = expected_include.error();
@@ -259,7 +261,7 @@ namespace program_n {
 							return CXChildVisit_Continue;
 						}
 
-						// Get included file path
+						// Get included file path.
 						CXFile included_cxfile = clang_getIncludedFile(cursor);
 						CXString included_cxname = clang_getFileName(included_cxfile);
 						const char *included_cstring = clang_getCString(included_cxname);
@@ -269,10 +271,23 @@ namespace program_n {
 						std::filesystem::path included_path = included_cstring;
 						clang_disposeString(included_cxname);
 
-						std::filesystem::file_time_type last_write_time = std::filesystem::last_write_time(included_path);
+						// Check header mod time.
+						std::filesystem::file_time_type header_time = std::filesystem::last_write_time(included_path);
+						if (header_time > visitor_data.time) {
+							// Header is newer so return
+							visitor_data.headers_are_newer = true;
+							return CXChildVisit_Break;
+						}
 
-						if (last_write_time > visitor_data.latest_header_write_time) {
-							visitor_data.latest_header_write_time = last_write_time;
+						std::expected<bool, error_t> expected_headers_are_newer = are_headers_newer(included_path, visitor_data.time, visitor_data.compiler_arguments);
+						if (!expected_headers_are_newer) {
+							visitor_data.error = expected_headers_are_newer.error().append("Error recursively getting headers_are_newer.");
+							return CXChildVisit_Break;
+						}
+
+						if (expected_headers_are_newer.value()) {
+							visitor_data.headers_are_newer = true;
+							return CXChildVisit_Break;
 						}
 					}
 
@@ -282,23 +297,24 @@ namespace program_n {
 				return CXChildVisit_Break;
 			};
 			
-			visitor_data_t visitor_data;
-			visitor_data.file = file;
+			visitor_data_t visitor_data {
+				.error = error,
+				.file = file,
+				.time = time,
+				.compiler_arguments = compiler_arguments,
+				.headers_are_newer = result,
+			};
 			clang_visitChildren(cursor, visitor, &visitor_data);
 			if (visitor_data.error) {
-				error = visitor_data.error.append(std::format("Error parsing headers from file \"{}\".", path));
 				break;
 			}
-
-			result = visitor_data.latest_header_write_time;
-			break;
 		} while (false);
 
 		clang_disposeTranslationUnit(translation_unit);
 		clang_disposeIndex(index);
 
 		if (error) {
-			return std::unexpected(error);
+			return std::unexpected(error.append(std::format("Error parsing headers from file \"{}\".", path)));
 		} else {
 			return result;
 		}
@@ -415,13 +431,13 @@ namespace program_n {
 			}
 
 			// Get headers and latest write time.
-			std::expected<std::filesystem::file_time_type, error_t> latest_header_write_time = get_latest_header_write_time(source_path, compiler_arguments);
-			if (!latest_header_write_time) {
-				return latest_header_write_time.error().append("Error finding source files that need recompiling").print();
+			std::expected<bool, error_t> expected_headers_are_newer = are_headers_newer(source_path, object_time, compiler_arguments);
+			if (!expected_headers_are_newer) {
+				return expected_headers_are_newer.error().append("Error finding source files that need recompiling").print();
 			}
 
 			// If headers are newer than object.
-			if (latest_header_write_time.value() > object_time) {
+			if (expected_headers_are_newer.value()) {
 				source_object_pairs.push_back(pair);
 				continue;
 			}
