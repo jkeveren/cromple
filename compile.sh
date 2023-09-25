@@ -28,7 +28,7 @@ g++ \
 `# Put it in the bin.`\
 -o bin/main \
 `# Yea compile that one.`\
-src/*.cpp
+src/main.cpp
 
 status=$?
 

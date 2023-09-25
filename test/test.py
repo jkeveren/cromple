@@ -42,7 +42,7 @@ def compile():
 compile()
 
 print("Test that object files are created.")
-object_files = ["main.cpp.o", "symlink.cpp.o"]
+object_files = ["main.cpp.o", "symlink.c.o"]
 for object_file in object_files:
 	object_path = os.path.join(object_directory, object_file)
 	if not os.path.isfile(object_path):
