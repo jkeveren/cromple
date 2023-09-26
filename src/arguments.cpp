@@ -9,7 +9,8 @@ namespace pgm {
 		std::string compiler;
 		std::vector<std::string> compiler_arguments;
 
-		static pgm::arguments parse(int argc, char **argv) {
+		static pgm::arguments
+		parse(int argc, char **argv) {
 			pgm::arguments arguments;
 
 			std::string source_directory;

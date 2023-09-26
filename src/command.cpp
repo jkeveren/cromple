@@ -62,7 +62,8 @@ namespace pgm {
 		}
 
 		// Runs the command to completion and returns status code.
-		std::expected<int, pgm::error> run() {
+		std::expected<int, pgm::error>
+		run() {
 			std::expected<::FILE *, pgm::error> pipe = start();
 			if (!pipe) {
 				return std::unexpected(pipe.error().append("Error starting command.", pipe.error().reason));

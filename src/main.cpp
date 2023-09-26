@@ -11,7 +11,6 @@
 
 #include <clang-c/Index.h>
 
-
 // I know, I know, don't include c(++) files.
 // I'm doing this to keep the build script dumb as hell.
 // It would be cool to not use another build tool to build this build tool.

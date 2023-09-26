@@ -16,12 +16,14 @@ namespace pgm {
 		translation_unit(const std::filesystem::path &root_path, const std::filesystem::path &object_directory) : root_path{root_path}, object_path{source_to_object(root_path, object_directory)} {}
 
 		// Converts a source path to an object path
-		static std::filesystem::path source_to_object(const std::filesystem::path &root_path, const std::filesystem::path &object_directory) {
+		static std::filesystem::path
+		source_to_object(const std::filesystem::path &root_path, const std::filesystem::path &object_directory) {
 			return object_directory / (root_path.filename().string() + ".o");
 		}
 
 		// Returns true if included files have a later modification time than time.
-		std::expected<bool, pgm::error> includes_are_newer(std::filesystem::file_time_type time, std::vector<std::string> compiler_arguments) const {
+		std::expected<bool, pgm::error>
+		includes_are_newer(std::filesystem::file_time_type time, std::vector<std::string> compiler_arguments) const {
 			// This function should only return at the end, outside the do{}while() statement.
 			// To exit the function, set error or result and break from the do{}while() statement.
 			pgm::error error;
@@ -178,7 +180,8 @@ namespace pgm {
 		}
 
 		// Checks if a translation units object file is out of date or non-existant.
-		std::expected<bool, pgm::error> object_is_outdated(const std::vector<std::string> &compiler_arguments) const {
+		std::expected<bool, pgm::error>
+		object_is_outdated(const std::vector<std::string> &compiler_arguments) const {
 			pgm::error error;
 			bool outdated = false;
 
@@ -243,7 +246,8 @@ namespace pgm {
 			}
 		}
 
-		static std::expected<std::vector<pgm::translation_unit>, pgm::error> find_all(const std::filesystem::path &source_directory, const std::filesystem::path &object_directory) {
+		static std::expected<std::vector<pgm::translation_unit>, pgm::error>
+		find_all(const std::filesystem::path &source_directory, const std::filesystem::path &object_directory) {
 			std::vector<pgm::translation_unit> units;
 			pgm::error error;
 

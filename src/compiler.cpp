@@ -11,7 +11,8 @@ namespace pgm {
 		public:
 		compiler(std::string executable, const std::vector<std::string> &arguments) : executable{executable}, arguments{arguments} {}
 
-		pgm::error compile(const pgm::translation_unit &unit) const {
+		pgm::error
+		compile(const pgm::translation_unit &unit) const {
 			// Pertinent args coppied directly from "gcc --help" command:
 			// -c                       Compile and assemble, but do not link.
 			// -o <file>                Place the output into <file>.
@@ -39,7 +40,8 @@ namespace pgm {
 			return pgm::error();
 		}
 
-		pgm::error link(const std::vector<pgm::translation_unit> &units, std::string out_file) {
+		pgm::error
+		link(const std::vector<pgm::translation_unit> &units, std::string out_file) {
 			// Build link command.
 			std::string command_string = std::format("{} -o {}", executable, out_file);
 			for (const std::string &argument : arguments) {

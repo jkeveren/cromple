@@ -57,7 +57,8 @@ namespace pgm {
 
 		// Appends the highest level error message to the message stack and overrides the reason.
 		// Returns self for chaining.
-		error append(const std::string &message, int reason = reason_other) {
+		error
+		append(const std::string &message, int reason = reason_other) {
 			this->reason = reason;
 			message_stack += message + "\n";
 			return *this;
@@ -65,13 +66,15 @@ namespace pgm {
 
 		// Prints the message_stack and returns reason int (handy for exiting program e.g. "int main() {...; return something.error().append("OOPSIE WOOPSIE!! Uwu We made a fucky wucky!!").print();}").
 		// message_stack is only accessible through printing to prevent easy access to the user unit for the reasons stated above in the section about message_stack etc.
-		int print(std::FILE *output_stream = stderr) const {
+		int
+		print(std::FILE *output_stream = stderr) const {
 			std::fputs(message_stack.c_str(), output_stream);
 			return reason;
 		}
 
 		// Constructs an error with message from errno in a thread safe way (using strerror_r instead of strerror).
-		static error strerror() {
+		static error
+		strerror() {
 			// This looks weird because the GNU version of strerror_r is weird and this is compatible.
 			char *error_reason = (char *)alloca(100);
 			error_reason = strerror_r(errno, error_reason, sizeof(error_reason));
