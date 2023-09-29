@@ -30,7 +30,7 @@ for entry in directory_iterator:
 if os.path.isfile(test_executable):
 	os.remove(test_executable)
 
-command = [subject_executable, "--compiler", "g++", "--source", source_directory, "--objects", object_directory, "-I", include_directory, "-o", test_executable]
+command = [subject_executable, "--compiler", "/usr/bin/g++", "--source", source_directory, "--objects", object_directory, "-I", include_directory, "-o", test_executable]
 print("Compilation command used in testing:", " ".join(command))
 
 def compile():
@@ -72,10 +72,10 @@ if os.stat(test_executable).st_mtime == executable_time:
 
 print("Test that the corresponding object files are recompiled when a header file is touched.")
 mod_time = os.stat(main_object).st_mtime
-pathlib.Path(os.path.join(include_directory, "touch_header.hpp")).touch()
+pathlib.Path(os.path.join(include_directory, "touch header.hpp")).touch()
 compile()
 if os.stat(main_object).st_mtime == mod_time:
-	raise SystemExit("main.cpp was not recompiled when touch_header.hpp was touched.")
+	raise SystemExit("main.cpp was not recompiled when \"touch header.hpp\" was touched.")
 
 print("Test that object file is recompiled when nested headers are touched.")
 mod_time = os.stat(main_object).st_mtime

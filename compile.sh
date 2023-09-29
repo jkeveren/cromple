@@ -24,14 +24,15 @@ g++ \
 -Wno-error=unused-parameter \
 -Wno-error=unused-result \
 -Wno-error=unused-variable \
+-Wno-error=unused-value \
 -lclang \
 `# Put it in the bin.`\
 -o bin/main \
 `# Yea compile that one.`\
-src/main.cpp
+src/*.cpp
 
 status=$?
 
-echo Done.
+echo End.
 
 exit $status
