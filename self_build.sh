@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+# This is just like ./build.sh except that it uses cromple itself to manage the build.
+
 ./bin/cromple \
 -O3 \
 -std=c++20 \
@@ -28,6 +30,6 @@
 
 status=$?
 
-echo End.
+echo Done.
 
 exit $status

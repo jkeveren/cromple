@@ -15,12 +15,13 @@ Building from source
 Installation
 	1. clone to somewhere you want to keep (~/.opt/cromple).
 	2. Build with "./build.sh"
-	3. symlink "/usr/local/bin/cromple" to "bin/cromple".
-			"ln -s "
+	3. Symlink "/usr/local/bin/cromple" to "bin/cromple".
+		as root: "ln -s ~/.opt/cromple/bin/cromple /usr/local/bin/cromple"
 
 Updating
 	1. "git pull"
-	2. "./build.sh", your symlink is already in the right place from the installation.
+	2. "./build.sh"
+		No need to copy the binary or re-create the symlink.
 
 Automated Tests
 	Tests are in the "test" directory. Run "test/test.py".
