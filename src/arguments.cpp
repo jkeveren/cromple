@@ -24,7 +24,7 @@ pgm::arguments::parse(int argc, char **argv) {
 	for (int i = 1; i < argc; i++) {
 		std::string arg = std::string(argv[i]);
 
-		// Store second part of non-compiler key-value arguments, e.g. "--compiler g++" or "-o out"
+		// Store second part of non-compiler key-value arguments, e.g. "--compiler /usr/bin/g++" or "-o out"
 		if (argument_pointer != nullptr) {
 			*argument_pointer = arg;
 			argument_pointer = nullptr;
@@ -52,8 +52,7 @@ pgm::arguments::parse(int argc, char **argv) {
 
 	// Default arguments.
 	if (source_directory.empty()) {source_directory = "src";}
-	constexpr std::string_view object_directory_default = "obj";
-	if (object_directory.empty()) {object_directory = object_directory_default;}
+	if (object_directory.empty()) {object_directory = "obj";}
 	if (out_file.empty()) {out_file = "a.out";}
 	if (arguments.compiler.empty()) {arguments.compiler = "/usr/bin/g++";}
 
