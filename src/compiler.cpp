@@ -91,7 +91,6 @@ pgm::compiler::link(const std::vector<translation_unit> &units, std::string out_
 	error.append(std::format("Error linking {} object files to final binary executable or library \"{}\" with command \"{}\".", units.size(), out_file, command_string));
 }
 
-// Get the make rule prerequisites generated from compiler -MM option.
 std::vector<std::string>
 pgm::compiler::get_make_prerequisites(const std::string &file, error &error) const {
 	do {

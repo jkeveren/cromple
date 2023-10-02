@@ -7,7 +7,7 @@ import pathlib
 print("Testing...")
 
 repo_root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-subject_executable = os.path.join(repo_root, "bin", "main")
+subject_executable = os.path.join(repo_root, "bin", "cromple")
 
 # Test directories.
 test_root = os.path.join(repo_root, "test")

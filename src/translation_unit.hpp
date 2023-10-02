@@ -11,6 +11,8 @@ namespace pgm {
 	class compiler;
 
 	// Manages a translation unit unit and it's object file.
+	// A translaation unit typically refers to a source file after it has been pre-processed so all includes are resolved.
+	// This class manages a source file, all other files that it includes and the object file that the translation unit will be compiled to.
 	class translation_unit {
 		public:
 		// Translation units are a file after pre-processing, so will include all header contents.
@@ -28,10 +30,13 @@ namespace pgm {
 		bool
 		object_is_outdated(const pgm::compiler &compiler, error &error) const;
 
+		// Find all translation_units in source_directory.
 		static
 		std::vector<pgm::translation_unit>
 		find_all(const std::filesystem::path &source_directory, const std::filesystem::path &object_directory, error &error);
 
+		// Find changed translation_units in units.
+		// compiler is used to parse #include directives from translation units.
 		static
 		std::vector<pgm::translation_unit>
 		find_changed(const std::vector<pgm::translation_unit> &units, const pgm::compiler &compiler, error &error);

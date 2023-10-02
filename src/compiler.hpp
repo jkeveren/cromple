@@ -16,9 +16,11 @@ namespace pgm {
 		public:
 		compiler(std::string executable, const std::vector<std::string> &arguments);
 
+		// Compiles source at unit.root_path to unit.object_path.
 		void
 		compile(const pgm::translation_unit &unit, error &error) const;
 
+		// Links objects at all object_paths in units to an output binary at out_file.
 		void
 		link(const std::vector<pgm::translation_unit> &units, std::string out_file, error &error);
 

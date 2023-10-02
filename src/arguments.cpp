@@ -40,6 +40,10 @@ pgm::arguments::parse(int argc, char **argv) {
 				argument_pointer = flag_iterator->second;
 				continue;
 			}
+
+			if (arg == "--help" || arg == "-h" || arg == "-?") {
+				arguments.help = true;
+			}
 		}
 
 		arguments.compiler_arguments.push_back(arg);
@@ -48,10 +52,10 @@ pgm::arguments::parse(int argc, char **argv) {
 
 	// Default arguments.
 	if (source_directory.empty()) {source_directory = "src";}
-	constexpr std::string_view object_directory_default = "objects";
+	constexpr std::string_view object_directory_default = "obj";
 	if (object_directory.empty()) {object_directory = object_directory_default;}
 	if (out_file.empty()) {out_file = "a.out";}
-	if (arguments.compiler.empty()) {arguments.compiler = "g++";}
+	if (arguments.compiler.empty()) {arguments.compiler = "/usr/bin/g++";}
 
 	// Convert to paths.
 	arguments.source_directory = std::filesystem::path(source_directory);

@@ -17,13 +17,14 @@
 #include "compiler.hpp"
 
 int main(int argc, char *argv[]) {
-	// Usage: <this executable> [--compiler COMPILER=g++] [--source SOURCE_DIRECTORY=src] [--objects OBJECT_DIRECTORY=objects] [-o OUTPUT_FILE=a.out] [COMPILER_OPTIONS]
-	// Order independent.
-	// TODO: add help and usage print on error.
-
 	pgm::error error;
 	
 	pgm::arguments arguments = pgm::arguments::parse(argc, argv);
+
+	if (arguments.help) {
+		std::cout << "Usage: cromple [--compiler COMPILER (default: /usr/bin/g++)] [--source SOURCE_DIRECTORY (default: src)] [--objects OBJECT_DIRECTORY (default: obj)] [-o OUTPUT_FILE (default: a.out)] [COMPILER_OPTIONS]" << std::endl;
+		return 0;
+	}
 
 	// Assert that arguments.source_directory exists and is a directory.
 	if (!std::filesystem::is_directory(arguments.source_directory)) {
