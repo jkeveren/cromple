@@ -26,7 +26,6 @@ g++ \
 -Wno-error=unused-result \
 -Wno-error=unused-variable \
 -Wno-error=unused-value \
--lclang \
 `# Put it in the bin.`\
 -o bin/cromple \
 `# Yea compile that one.`\

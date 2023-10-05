@@ -2,6 +2,7 @@
 
 #include <list>
 #include <format>
+#include <iostream>
 
 #include <unistd.h>
 #include <sys/wait.h>

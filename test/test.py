@@ -3,6 +3,7 @@
 import os
 import subprocess
 import pathlib
+import time
 
 print("Testing...")
 
@@ -63,6 +64,7 @@ if os.stat(main_object).st_mtime != main_object_time:
 print("Test that object file and executable is recompiled when a source file is touched.")
 main_object_time = os.stat(main_object).st_mtime
 executable_time = os.stat(test_executable).st_mtime
+time.sleep(1) # Sleep before touch to allow for low resolution modification timestamps like on sshfs.
 pathlib.Path(main_source).touch()
 compile()
 if os.stat(main_object).st_mtime == main_object_time:
@@ -72,6 +74,7 @@ if os.stat(test_executable).st_mtime == executable_time:
 
 print("Test that the corresponding object files are recompiled when a header file is touched.")
 mod_time = os.stat(main_object).st_mtime
+time.sleep(1)
 pathlib.Path(os.path.join(include_directory, "touch header.hpp")).touch()
 compile()
 if os.stat(main_object).st_mtime == mod_time:
@@ -79,6 +82,7 @@ if os.stat(main_object).st_mtime == mod_time:
 
 print("Test that object file is recompiled when nested headers are touched.")
 mod_time = os.stat(main_object).st_mtime
+time.sleep(1)
 pathlib.Path(os.path.join(include_directory, "deep_touch_header.hpp")).touch()
 compile()
 if os.stat(main_object).st_mtime == mod_time:

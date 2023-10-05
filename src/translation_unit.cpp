@@ -49,6 +49,7 @@ pgm::translation_unit::object_is_outdated(const pgm::compiler &compiler, error &
 				error.append(filesystem_error.what()).append(std::format("Error getting modification time for prerequisite \"{}\".", prerequisite));
 				break;
 			}
+			// std::cout << prerequisite << " " << time.time_since_epoch().count() << " " << object_time.time_since_epoch().count() << std::endl;
 			if (time > object_time) {
 				return true;
 			}
