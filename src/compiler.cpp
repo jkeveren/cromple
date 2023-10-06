@@ -88,7 +88,7 @@ pgm::compiler::link(const std::vector<translation_unit> &units, std::string out_
 	for (const std::string &part : command) {
 		command_string += " " + part;
 	}
-	error.append(std::format("Error linking final binary executable or library \"{}\" from {} object files with command \"{}\".", units.size(), out_file, command_string));
+	error.append(std::format("Error linking final binary executable or library \"{}\" from {} object files with command \"{}\".", out_file, units.size(), command_string));
 }
 
 std::vector<std::string>

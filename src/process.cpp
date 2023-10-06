@@ -2,7 +2,6 @@
 
 #include <list>
 #include <format>
-#include <iostream>
 
 #include <unistd.h>
 #include <sys/wait.h>
@@ -13,7 +12,7 @@ pgm::process::child::child(pid_t pid, int stdin, int stdout, int stderr) : pid{p
 
 std::vector<std::byte>
 pgm::process::child::read_all(const int file_descriptor, error &error) {
-	constexpr size_t chunk_size = 11;
+	constexpr size_t chunk_size = 1000;
 
 	// Use a list for linear time complexity.
 	// This avoids reallocation as a vector grows.
@@ -134,26 +133,14 @@ pgm::process::child::read_all_stderr_string(error &error) const {
 
 int
 pgm::process::child::wait(error &error) const {
-	do {
-		int wstatus;
-		pid_t maybe_pid = waitpid(pid, &wstatus, 0);
-		if (maybe_pid == -1) {
-			error.strerror();
-			break;
-		}
+	siginfo_t info;
+	int ok = waitid(P_PID, static_cast<unsigned>(pid), &info, WEXITED);
+	if (ok != 0) {
+		error.strerror().append(std::format("Error waiting for child process \"{}\".", pid));
+		return 0;
+	}
 
-		bool exited_normally = WIFEXITED(wstatus);
-		if (!exited_normally) {
-			error.append("Process exited abnormally. Did not call exit() or return from main.", error_reason_exited_abnormally);
-			break;
-		}
-
-		int exit_status = WEXITSTATUS(wstatus);
-		return exit_status;
-	} while (false);
-
-	error.append(std::format("Error waiting for child process \"{}\".", pid));
-	return 0;
+	return info.si_status;
 }
 
 template<typename data_type>
