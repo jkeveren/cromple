@@ -13,7 +13,7 @@ Building from source
 	it outputs to "bin/cromple".
 
 Installation
-	1. Build with "build.sh".
+	1. Build with "./build.sh".
 	2. Install with "./install.sh" (copies "bin/cromple" to "/usr/local/bin").
 		This will ask for password. Read the script first (it's one line).
 
@@ -24,4 +24,4 @@ Updating
 
 Automated Tests
 	Tests are in the "test" directory. Run "test/test.py".
-	"watch.sh" uses entr (https://eradman.com/entrproject) to rebuild and run tests.
+	"./watch.sh" uses entr (https://eradman.com/entrproject) to rebuild and run tests when relevant files change.
