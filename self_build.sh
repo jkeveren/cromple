@@ -21,6 +21,4 @@
 
 status=$?
 
-echo Done.
-
 exit $status

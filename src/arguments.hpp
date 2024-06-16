@@ -12,6 +12,7 @@ namespace pgm {
 		std::filesystem::path out_file;
 		std::string compiler;
 		std::vector<std::string> compiler_arguments;
+		// static bool verbose = false;
 		bool help = false;
 
 		// Parse program arguments into an instance of arguments.

@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	// Link.
 	if (units.size() > 0) {
 		compiler.link(units, arguments.out_file, error);
 		if (error) {

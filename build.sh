@@ -23,6 +23,4 @@ src/*.cpp
 
 status=$?
 
-echo End.
-
 exit $status
