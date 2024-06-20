@@ -9,8 +9,6 @@
 
 #include <cstring>
 
-#include <clang-c/Index.h>
-
 #include "arguments.hpp"
 #include "error.hpp"
 #include "translation_unit.hpp"
@@ -52,6 +50,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Compile objects.
+	// This should be parallelised.
 	for (const pgm::translation_unit &unit : changed_units) {
 		compiler.compile(unit, error);
 		if (error) {

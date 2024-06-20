@@ -24,7 +24,7 @@ pgm::arguments::parse(int argc, char **argv) {
 	for (int i = 1; i < argc; i++) {
 		std::string arg = std::string(argv[i]);
 
-		// Store second part of non-compiler key-value arguments, e.g. "--compiler /usr/bin/g++" or "-o out"
+		// Store second part of non-compiler key-value arguments, e.g. "--compiler /usr/bin/g++" or "-o out".
 		if (argument_pointer != nullptr) {
 			*argument_pointer = arg;
 			argument_pointer = nullptr;
