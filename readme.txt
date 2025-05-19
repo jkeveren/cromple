@@ -34,8 +34,10 @@ Usage
   It's recommended to create a simple build script using the above command to
   store options. Here's an example that links some OpenGL libraries and
   specifies some error options:
+
   "
   #!/usr/bin/bash
+
   cromple \
   -lglfw -lGL -lGLEW \
   -std=c++23 \
@@ -54,14 +56,13 @@ Usage
   -Wno-error=unused-variable
   "
 
-
 Building from source
   run "./build.sh". The executable is compiled to "bin/cromple".
 
 Installation
 1. Build with "./build.sh".
 2. Install with "./install.sh" (copies "bin/cromple" to "/usr/local/bin").
-	This will ask for password. Read the script first (it's one line).
+   This will ask for password. Read the script first (it's one line).
 
 Updating
 1. Pull updates with "git pull".
