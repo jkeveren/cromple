@@ -31,7 +31,6 @@ Usage
   All other options are passed directly to the compiler during both compilation
   and linking without modification.
 
-  [--compiler COMPILER (default: /usr/bin/g++)] [--source SOURCE_DIRECTORY (default: src)] [--objects OBJECT_DIRECTORY (default: obj)] [-o OUTPUT_FILE (default: a.out)]
   It's recommended to create a simple build script using the above command to
   store options. Here's an example that links some OpenGL libraries and
   specifies some error options:
