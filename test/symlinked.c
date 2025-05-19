@@ -3,5 +3,5 @@
 #include "header.hpp"
 
 std::string get_string() {
-	return "Hello World!";
+	return "Hello World! I'm an executable!";
 }

@@ -10,9 +10,9 @@ print("Testing...")
 repo_root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
 subject_executable = os.path.join(repo_root, "bin", "cromple")
 
-# Test directories.
+# Test directories. (non-default to ensure options work)
 test_root = os.path.join(repo_root, "test")
-source_directory = os.path.join(test_root, "src")
+source_directory = os.path.join(test_root, "source")
 object_directory = os.path.join(test_root, "objects")
 include_directory = os.path.join(test_root, "include")
 
@@ -95,3 +95,4 @@ if popen.returncode != 0:
 	raise SystemExit(f"Test executable exited with non-zero return code {popen.returncode}.")
 
 print("All tests passed.")
+

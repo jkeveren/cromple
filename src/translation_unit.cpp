@@ -1,7 +1,6 @@
 #include "translation_unit.hpp"
 
 #include <format>
-#include <regex>
 #include <iostream>
 
 pgm::translation_unit::translation_unit(const std::filesystem::path &root_path, const std::filesystem::path &object_directory) : root_path{root_path}, object_path{source_to_object(root_path, object_directory)} {}
@@ -29,12 +28,12 @@ pgm::translation_unit::object_is_outdated(const pgm::compiler &compiler, error &
 			if (filesystem_error.code() == std::errc::no_such_file_or_directory) {
 				return true;
 			}
-			
+
 			error.append(filesystem_error.what()).append(std::format("Error getting modification time of object file \"{}\".", object_path.string()));
 			break;
 		}
 
-		// Get object file prerequisites.
+		// Get headers that are #included in root file.
 		std::vector<std::string> prerequisites = compiler.get_make_prerequisites(root_path.string(), error);
 		if (error) {
 			break;
@@ -80,23 +79,45 @@ pgm::translation_unit::find_all(const std::filesystem::path &source_directory, c
 			iterator = std::filesystem::directory_iterator(source_directory);
 		} catch (std::exception &e) {
 			error.append(e.what()).append(std::format("Error getting directory iterator for \"{}\".", source_directory.string()));
-			break;
+			break; 
 		}
 
 		// Iterate over source_directory entries.
 		for (const std::filesystem::directory_entry &entry : iterator) {
-			// Skip non-readable files. Do not skip symlinks (!is_regular_file would make us skip symlinks).
+			// Skip non-readable entries. Do not skip symlinks (!is_regular_file would make us skip symlinks).
 			if (entry.is_directory()) {
 				continue;
 			}
 
-			std::filesystem::path root_path = entry.path();
+			std::filesystem::path root_path(entry.path());
 
-			// Skip non-"*.c*" source files.
-			static std::regex c_source_file_regex(".+\\.c.*?$");
-			if (!std::regex_match(root_path.string(), c_source_file_regex)) {
+			// Skip non-source files.
+			// https://gcc.gnu.org/onlinedocs/gcc-4.4.1/gcc/Overall-Options.html#index-file-name-suffix-71
+			static std::vector<std::string> valid_extensions {
+				".c",
+				".cc",
+				".cp",
+				".cxx",
+				".cpp",
+				".c++",
+				".C"
+			};
+			const std::string actual_extension(root_path.extension().string());
+			bool actual_is_invalid = true;
+			for (const std::string &valid_extension : valid_extensions) {
+				if (actual_extension == valid_extension) {
+					actual_is_invalid = false;
+					break;
+				}
+			}
+			if (actual_is_invalid) {
 				continue;
 			}
+			// Alternative looser regex implementation
+			// static std::regex c_source_file_regex(".+\\.c[^\\.]*$");
+			//  if (!std::regex_match(root_path.string(), c_source_file_regex)) {
+			// 	 continue;
+			// }
 
 			units.emplace_back(root_path, object_directory);
 		}

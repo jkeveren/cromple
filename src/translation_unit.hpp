@@ -15,7 +15,7 @@ namespace pgm {
 	// This class manages a source file, all other files that it includes and the object file that the translation unit will be compiled to.
 	class translation_unit {
 		public:
-		// Translation units are a file after pre-processing, so will include all header contents.
+		// A translation unit is a file after pre-processing, so will include all header contents.
 		// root_path refers to the source file that, optionally, #include all of those headers.
 		const std::filesystem::path root_path;
 		const std::filesystem::path object_path; // Path of the object file that compilation should generate.
@@ -26,7 +26,7 @@ namespace pgm {
 		static std::filesystem::path
 		source_to_object(const std::filesystem::path &root_path, const std::filesystem::path &object_directory);
 
-		// Checks if a translation units object file is out of date or non-existant.
+		// Checks if the object file for a translation unit is out of date or non-existant.
 		bool
 		object_is_outdated(const pgm::compiler &compiler, error &error) const;
 

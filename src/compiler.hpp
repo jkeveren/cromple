@@ -11,6 +11,7 @@ namespace pgm {
 	class translation_unit;
 	
 	class compiler {
+		// Vector of compiler and arguments to run the compiler.
 		std::vector<std::string> command_parts;
 		
 		public:

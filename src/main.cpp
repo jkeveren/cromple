@@ -16,7 +16,7 @@
 
 int main(int argc, char *argv[]) {
 	pgm::error error;
-	
+
 	pgm::arguments arguments = pgm::arguments::parse(argc, argv);
 
 	if (arguments.help) {
