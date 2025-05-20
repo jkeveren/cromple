@@ -10,7 +10,7 @@ Features and Benefits
 
 
 Usage
-  command: "cromple [OPTION]..."
+  Usage: cromple [OPTION]...
 
   Options that are understood by cromple are used by cromple and the rest are
   passed on to the compiler. Option names have been chosen carefully to avoid

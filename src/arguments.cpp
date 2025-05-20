@@ -6,14 +6,17 @@ pgm::arguments
 pgm::arguments::parse(int argc, char **argv) {
 	pgm::arguments arguments;
 
-	std::string source_directory;
-	std::string object_directory;
-	std::string out_file;
+	// Default arguments
+	std::string source_directory("src");
+	std::string object_directory("obj");
+	std::string out_file("a.out");
+	arguments.compiler = "/usr/bin/g++";
 
 	std::map<std::string, std::string *> argument_pointers {
-		{"--source", &source_directory}, // source_directory must be provided by a named argument because we can't know which arguments belong to a previous compiler argument like "library" in "-l library". We can't accurately parse all compiler args.
-		{"--objects", &object_directory},
-		{"-o", &out_file},
+		// {flags,     argument pointers  }
+		{"--source",   &source_directory  }, // source_directory must be provided by a named argument because we can't know which arguments belong to a previous compiler argument like "library" in "-l library". We can't accurately parse all compiler args.
+		{"--objects",  &object_directory  },
+		{"-o",         &out_file          },
 		{"--compiler", &arguments.compiler},
 	};
 
@@ -24,8 +27,9 @@ pgm::arguments::parse(int argc, char **argv) {
 	for (int i = 1; i < argc; i++) {
 		std::string arg = std::string(argv[i]);
 
-		// Store second part of non-compiler key-value arguments, e.g. "--compiler /usr/bin/g++" or "-o out".
+		// If expecting this argument to be the value in a key-value pair, e.g. "--compiler /usr/bin/g++" or "-o out".
 		if (argument_pointer != nullptr) {
+			// Store argument value in the pointed to location
 			*argument_pointer = arg;
 			argument_pointer = nullptr;
 			continue;
@@ -35,28 +39,25 @@ pgm::arguments::parse(int argc, char **argv) {
 		if (arg[0] == '-') {
 			// Point argument_pointer to place to store next argument.
 			std::map<std::string, std::string *>::iterator flag_iterator = argument_pointers.find(arg);
-			// Is this a non-compiler key-value argument?
+			// If this is a non-compiler key-value argument
 			if (flag_iterator != argument_pointers.end()) {
+				// Set argument_pointer so we store the next argument in the correct location.
 				argument_pointer = flag_iterator->second;
 				continue;
 			}
 
 			if (arg == "--help" || arg == "-h" || arg == "-?") {
 				arguments.help = true;
+				continue;
 			}
 		}
 
+		// Store all other arguments to be passed directly to the compiler.
 		arguments.compiler_arguments.push_back(arg);
 		continue;
 	}
 
-	// Default arguments.
-	if (source_directory.empty()) {source_directory = "src";}
-	if (object_directory.empty()) {object_directory = "obj";}
-	if (out_file.empty()) {out_file = "a.out";}
-	if (arguments.compiler.empty()) {arguments.compiler = "/usr/bin/g++";}
-
-	// Convert to paths.
+	// Convert string path arguments to filesystems::path.
 	arguments.source_directory = std::filesystem::path(source_directory);
 	arguments.object_directory = std::filesystem::path(object_directory);
 	arguments.out_file = std::filesystem::path(out_file);
